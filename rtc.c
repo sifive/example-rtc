@@ -8,6 +8,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
+#include <sys/times.h>
+#include <unistd.h>
 #include <time.h>
 
 #define RTC_TIMEOUT_SECONDS 1
@@ -91,11 +93,22 @@ int main() {
 	/* Start the rtc */
 	metal_rtc_run(rtc, METAL_RTC_RUN);
 
+#ifdef _PICOLIBC__
+	long timebase = sysconf(_SC_CLK_TCK);
+	struct tms tms;
+	clock_t timeout = times(&tms) + 2 * RTC_TIMEOUT_SECONDS * timebase;
+#else
 	/* If the rtc doesn't fire after twice the requested timeout, fail */
 	time_t timeout = time(NULL) + (2 * RTC_TIMEOUT_SECONDS);
-	
+#endif
+
 	while (!caught_rtc_int) {
-		if (time(NULL) > timeout) {
+#ifdef _PICOLIBC__
+		if (times(&tms) > timeout)
+#else
+		if (time(NULL) > timeout)
+#endif
+		{
 			/* Stop the rtc */
 			metal_rtc_run(rtc, METAL_RTC_STOP);
 
